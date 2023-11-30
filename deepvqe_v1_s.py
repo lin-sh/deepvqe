@@ -148,27 +148,26 @@ class DeepVQE(nn.Module):
         self.fe = FE()
 
 
-        self.align = AlignBlock(128, 128)
-        self.enblockRef1 = EncoderBlock(2, 32)
-        self.enblockRef2 = EncoderBlock(32, 128)
+        self.align = AlignBlock(24, 24)
+        self.enblockRef1 = EncoderBlock(2, 8)
+        self.enblockRef2 = EncoderBlock(8, 24)
 
 
-        self.enblock1 = EncoderBlock(2, 64)
-        self.enblock2 = EncoderBlock(64, 128)
-        self.enblock3 = EncoderBlock(256, 128)
-        self.enblock4 = EncoderBlock(128, 128)
-        self.enblock5 = EncoderBlock(128, 128)
+        self.enblock1 = EncoderBlock(2, 16)
+        self.enblock2 = EncoderBlock(16, 24)
+        self.enblock3 = EncoderBlock(48, 56)
+        self.enblock4 = EncoderBlock(56, 24)
         
-        self.bottle = Bottleneck(128*9, 64*9)
+        self.bottle = Bottleneck(24*17, 12*17)
         
-        self.deblock5 = DecoderBlock(128, 128)
-        self.deblock4 = DecoderBlock(128, 128)
-        self.deblock3 = DecoderBlock(128, 128)
-        self.deblock2 = DecoderBlock(128, 64)
-        self.deblock1 = DecoderBlock(64, 27)
+        self.deblock4 = DecoderBlock(24, 56)
+        self.deblock3 = DecoderBlock(56, 24)
+        self.deblock2 = DecoderBlock(24, 16)
+        self.deblock1 = DecoderBlock(16, 27)
         self.ccm = CCM()
         
-    def forward(self, x, y):
+    def forward(self, x):
+        y = x
         en_y0 = self.fe(y)            
         en_y1 = self.enblockRef1(en_y0)  
         en_y2 = self.enblockRef2(en_y1)  
@@ -184,12 +183,10 @@ class DeepVQE(nn.Module):
 
         en_x3 = self.enblock3(en_xy1)  # ; print(en_x3.shape)
         en_x4 = self.enblock4(en_x3)  # ; print(en_x4.shape)
-        en_x5 = self.enblock5(en_x4)  # ; print(en_x5.shape)
 
-        en_xr = self.bottle(en_x5)    # ; print(en_xr.shape)
+        en_xr = self.bottle(en_x4)    # ; print(en_xr.shape)
         
-        de_x5 = self.deblock5(en_xr, en_x5)[..., :en_x4.shape[-1]]  # ; print(de_x5.shape)
-        de_x4 = self.deblock4(de_x5, en_x4)[..., :en_x3.shape[-1]]  # ; print(de_x4.shape)
+        de_x4 = self.deblock4(en_xr, en_x4)[..., :en_x3.shape[-1]]  # ; print(de_x4.shape)
         de_x3 = self.deblock3(de_x4, en_x3)[..., :en_x2.shape[-1]]  # ; print(de_x3.shape)
         de_x2 = self.deblock2(de_x3, en_x2)[..., :en_x1.shape[-1]]  # ; print(de_x2.shape)
         de_x1 = self.deblock1(de_x2, en_x1)[..., :en_x0.shape[-1]]  # ; print(de_x1.shape)
@@ -202,24 +199,24 @@ class DeepVQE(nn.Module):
 
 if __name__ == "__main__":
     model = DeepVQE().eval()
-    x = torch.randn(1, 257, 63, 2)
-    x1 = torch.randn(1, 257, 63, 2)
-    y = model(x, x1)
+    # x = torch.randn(1, 257, 63, 2)
+    # x1 = torch.randn(1, 257, 63, 2)
+    # y = model(x, x1)
 
     
     from ptflops import get_model_complexity_info
     flops, params = get_model_complexity_info(model, (257, 63, 2), as_strings=True,
-                                           print_per_layer_stat=True, verbose=True)
+                                           print_per_layer_stat=False, verbose=True)
     print(flops, params)
 
-    """causality check"""
-    a = torch.randn(1, 257, 100, 2)
-    b = torch.randn(1, 257, 100, 2)
-    c = torch.randn(1, 257, 100, 2)
-    x1 = torch.cat([a, b], dim=2)
-    x2 = torch.cat([a, c], dim=2)
-    y1 = model(x1, x2)
-    y2 = model(x2, x1)
-    print((y1[:,:,:100,:] - y2[:,:,:100,:]).abs().max())
-    print((y1[:,:,100:,:] - y2[:,:,100:,:]).abs().max())
+    # """causality check"""
+    # a = torch.randn(1, 257, 100, 2)
+    # b = torch.randn(1, 257, 100, 2)
+    # c = torch.randn(1, 257, 100, 2)
+    # x1 = torch.cat([a, b], dim=2)
+    # x2 = torch.cat([a, c], dim=2)
+    # y1 = model(x1, x2)
+    # y2 = model(x2, x1)
+    # print((y1[:,:,:100,:] - y2[:,:,:100,:]).abs().max())
+    # print((y1[:,:,100:,:] - y2[:,:,100:,:]).abs().max())
         
